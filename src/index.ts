@@ -21,7 +21,7 @@ const supabaseKey = process.env.SUPABASE_KEY!
 const supabase = createClient<Database>(supabaseUrl, supabaseKey)
 // console.log(supabase)
 
-const BOT_TOKEN = process.env.BOT_TOKEN || '';
+const BOT_TOKEN = '7100975194:AAHj3_7mCH9lHCQ54axMS9XtqykSQuMYh-8';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -43,7 +43,7 @@ const doesUserExist = async (tgId: number) => {
   return !!count && count > 0
 }
 
-const WEB_APP_URL = process.env.WEB_APP_URL || ''
+const WEB_APP_URL = 'https://chomp-2jx93zpjt-gator-labs.vercel.app/bot'
 
 
 bot.on("inline_query", ctx =>
