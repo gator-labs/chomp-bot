@@ -18,6 +18,7 @@ const supabase = createClient<Database>(supabaseUrl, supabaseKey)
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 
+// Bot token Tiplink
 const bot = new Telegraf(BOT_TOKEN);
 
 //prod mode (Vercel)
