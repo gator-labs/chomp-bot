@@ -2,7 +2,7 @@ import { Telegraf, Markup, Context } from 'telegraf';
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { development, production } from './core';
-
+import { kv } from '@vercel/kv';
 import { IBotUser } from './interfaces/bot-users';
 import {
   adaptCtx2User,
@@ -12,7 +12,7 @@ import {
   handleCreateUser,
   initEmailAuthentication,
   verifyEmail,
-  getQuestion
+  getQuestion,
 } from './lib/utils';
 
 /*
@@ -22,10 +22,6 @@ import {
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 
-let user: any;
-let emailAddress: string;
-let verificationUUID: string;
-let isVerify: boolean;
 const bot = new Telegraf(BOT_TOKEN);
 
 //prod mode (Vercel)
@@ -82,9 +78,6 @@ const replyWithReveal = async (ctx: Context) => {
   ENTRYPOINT - START
 */
 bot.start(async (ctx) => {
-  console.log('Start command received');
-  console.log(ctx.from);
-  console.log(ctx.chat.id);
   const newUser: IBotUser = adaptCtx2User(ctx);
   const { tg_id: tgId } = newUser;
 
@@ -95,10 +88,10 @@ bot.start(async (ctx) => {
   if (!userExists) {
     const response = await createUserByTelegram(tgId);
     if (response) {
-      user = response;
+      await kv.set(`user:${tgId}`, response);
     }
   } else {
-    user = userExists.profiles;
+    await kv.set(`user:${tgId}`, userExists.profile);
   }
 
   replyWithPrimaryOptions(ctx);
@@ -109,22 +102,21 @@ bot.start(async (ctx) => {
 */
 bot.action('new.quickstart', async (ctx) => {
   try {
-    const id = user?.profile?.id
-    const deck = await getQuestion(id)
+    const user = (await kv.get(`user:${ctx.from.id}`)) as any;
+    const deck = await getQuestion(user.id);
 
-    const {question, questionOptions} = deck
-    const prompt = question
+    const { question, questionOptions } = deck;
+    const prompt = question;
 
-    const buttons = questionOptions.map((option: {id: number, option: any, isLeft: boolean}, index:number)=>
-      Markup.button.callback(`${option.option}`, option.option)
-    )
+    const buttons = questionOptions.map(
+      (option: { id: number; option: any; isLeft: boolean }, index: number) =>
+        Markup.button.callback(`${option.option}`, option.option),
+    );
     ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-
   } catch (error) {
     console.error('Error making API call:', error);
     ctx.reply('Failed to fetch data from API.');
   }
-
 });
 /*
   ANSWERING FIRST ORDER -> ANSWERING SECOND ORDER
@@ -360,7 +352,8 @@ const emailRegex =
 
 bot.hears(emailRegex, async (ctx) => {
   const { match: emailAddresses } = ctx;
-  emailAddress = emailAddresses[0];
+  const emailAddress = emailAddresses[0];
+  await kv.set(`email:${ctx.from.id}`, emailAddress);
 
   // check if user exists
   const userExists = await getUserByEmail(emailAddress);
@@ -368,8 +361,9 @@ bot.hears(emailRegex, async (ctx) => {
   if (userExists) {
     replyWithReveal(ctx);
   } else {
-    verificationUUID = await initEmailAuthentication(emailAddress, ctx);
-    isVerify = true;
+    const verificationUUID = await initEmailAuthentication(emailAddress, ctx);
+    await kv.set(`verification:${ctx.from.id}`, verificationUUID);
+    await kv.set(`isVerify:${ctx.from.id}`, true);
   }
 });
 
@@ -378,14 +372,16 @@ bot.hears(emailRegex, async (ctx) => {
 */
 const otpRegex = /(?:\d{6})/;
 bot.hears(otpRegex, async (ctx) => {
-  const newUser: IBotUser = adaptCtx2User(ctx);
-  const { tg_id: tgId } = newUser;
+  const tgId = ctx.from.id;
+  const isVerify = (await kv.get(`isVerify:${tgId}`)) as boolean;
   if (!isVerify) {
     ctx.reply('Please type /start to continue.');
     return;
   } else {
     const { match: otps } = ctx;
     const otp = otps[0];
+    const emailAddress = (await kv.get(`email:${tgId}`)) as string;
+    const verificationUUID = (await kv.get(`verification:${tgId}`)) as string;
     const response = await verifyEmail(
       emailAddress,
       verificationUUID,
@@ -393,7 +389,8 @@ bot.hears(otpRegex, async (ctx) => {
       ctx,
     );
     if (response) {
-      isVerify = false;
+      await kv.set(`isVerify:${tgId}`, false);
+      const user = (await kv.get(`user:${tgId}`)) as any;
       const dynamicUser = await handleCreateUser(
         user.id,
         response.user.id,
@@ -411,6 +408,7 @@ bot.hears(otpRegex, async (ctx) => {
   NEW -> SELECTED REVEAL
 */
 bot.action('new.reveal', async (ctx) => {
+  const user = (await kv.get(`user:${ctx.from.id}`)) as any;
   if (user?.wallets) {
     replyWithReveal(ctx);
   } else {

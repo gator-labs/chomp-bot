@@ -88,7 +88,7 @@ export const getUserByEmail = async (email: string) => {
   }
 };
 
-// get questions from daily deck and unanswered questions
+// Get questions from daily deck and unanswered questions
 export const getQuestion = async (id: string) => {
   try {
     const response = await axios.get(
