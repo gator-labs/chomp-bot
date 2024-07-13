@@ -45,6 +45,7 @@ export const createUserByTelegram = async (tgId: number) => {
         },
       },
     );
+
     return response.data;
   } catch {
     return null;
@@ -82,6 +83,24 @@ export const getUserByEmail = async (email: string) => {
       },
     );
     return response.data;
+  } catch {
+    return null;
+  }
+};
+
+// get questions from daily deck and unanswered questions
+export const getQuestion = async (id: string) => {
+  try {
+    const response = await axios.get(
+      `${API_HOST_URL}/api/question/get?userId=${id}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': BOT_API_KEY,
+        },
+      },
+    );
+    return response.data.question;
   } catch {
     return null;
   }

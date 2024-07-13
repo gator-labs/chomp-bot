@@ -12,6 +12,7 @@ import {
   handleCreateUser,
   initEmailAuthentication,
   verifyEmail,
+  getQuestion
 } from './lib/utils';
 
 /*
@@ -107,19 +108,24 @@ bot.start(async (ctx) => {
   NEW -> ANSWERING FIRST ORDER
 */
 bot.action('new.quickstart', async (ctx) => {
-  const prompt = 'Which of the following is NOT a DEX?';
-  const buttonOptions: { [k: string]: string } = {
-    'answering-first-order.1': 'Jupiter',
-    'answering-first-order.2': 'Raydium',
-    'answering-first-order.3': 'Orca',
-    'answering-first-order.4': 'Phoenix',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
+  try {
+    const id = user?.profile?.id
+    const deck = await getQuestion(id)
 
+    const {question, questionOptions} = deck
+    const prompt = question
+
+    const buttons = questionOptions.map((option: {id: number, option: any, isLeft: boolean}, index:number)=>
+      Markup.button.callback(`${option.option}`, option.option)
+    )
+    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+
+  } catch (error) {
+    console.error('Error making API call:', error);
+    ctx.reply('Failed to fetch data from API.');
+  }
+
+});
 /*
   ANSWERING FIRST ORDER -> ANSWERING SECOND ORDER
 */
