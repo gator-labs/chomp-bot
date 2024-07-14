@@ -1,7 +1,10 @@
 import { Context } from 'telegraf';
-import { EBotUserState, IBotUser } from '../interfaces/bot-users';
+import { EBotUserState, IBotUser } from '../interfaces/botUser';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import { IChompUser, IChompUserResponse } from '../interfaces/chompUser';
+import { IQuestion } from '../interfaces/question';
+import { IAnswerResponse } from '../interfaces/answer';
 
 const BOT_API_KEY = process.env.BOT_API_KEY;
 const API_HOST_URL = process.env.API_HOST_URL;
@@ -29,7 +32,9 @@ export const adaptCtx2User = (ctx: Context) => {
 };
 
 // Create temporary user with random uuid using Telegram ID
-export const createUserByTelegram = async (tgId: number) => {
+export const createUserByTelegram = async (
+  tgId: number,
+): Promise<IChompUser | null> => {
   const randomUUID = uuidv4();
   try {
     const response = await axios.post(
@@ -53,7 +58,9 @@ export const createUserByTelegram = async (tgId: number) => {
 };
 
 // Fetch user by Telegram ID
-export const getUserByTelegram = async (tgId: number) => {
+export const getUserByTelegram = async (
+  tgId: number,
+): Promise<IChompUserResponse | null> => {
   try {
     const response = await axios.get(
       `${API_HOST_URL}/api/user/telegram?telegramId=${tgId.toString()}`,
@@ -71,7 +78,9 @@ export const getUserByTelegram = async (tgId: number) => {
 };
 
 // Fetch user by Email
-export const getUserByEmail = async (email: string) => {
+export const getUserByEmail = async (
+  email: string,
+): Promise<IChompUser | null> => {
   try {
     const response = await axios.get(
       `${API_HOST_URL}/api/user?email=${email}`,
@@ -89,7 +98,7 @@ export const getUserByEmail = async (email: string) => {
 };
 
 // Get questions from daily deck and unanswered questions
-export const getQuestion = async (id: string) => {
+export const getQuestion = async (id: string): Promise<IQuestion | null> => {
   try {
     const response = await axios.get(
       `${API_HOST_URL}/api/question/get?userId=${id}`,
@@ -131,7 +140,6 @@ export const initEmailAuthentication = async (email: string, ctx: Context) => {
   );
   return verificationUUID;
 };
-
 
 // Verify OTP and create embedded wallet based on email as identifier
 export const verifyEmail = async (
@@ -178,7 +186,6 @@ export const verifyEmail = async (
   }
 };
 
-
 // Replace temporary user with dynamic user including email and wallet in the database
 export const handleCreateUser = async (
   id: string,
@@ -187,7 +194,7 @@ export const handleCreateUser = async (
   address: string,
   email: string,
   ctx: Context,
-) => {
+): Promise<IChompUser | null> => {
   try {
     const response = await axios.post(
       `${API_HOST_URL}/api/user`,
@@ -206,6 +213,74 @@ export const handleCreateUser = async (
       },
     );
     ctx.reply('Wallet created successfully!');
+    return response.data;
+  } catch {
+    return null;
+  }
+};
+
+export const saveDeck = async (
+  deckId: number,
+  userId: string,
+  questionId: number,
+  questionOptionId: number,
+  percentageGiven: number,
+): Promise<IAnswerResponse | null> => {
+  try {
+    const response = await axios.post(
+      `${API_HOST_URL}/api/answer/deck`,
+      {
+        deckId,
+        userId,
+        answers: [
+          {
+            questionId,
+            questionOptionId,
+            percentageGiven,
+            percentageGivenForAnswerId: questionId,
+            timeToAnswerInMiliseconds: null,
+          },
+        ],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': BOT_API_KEY,
+        },
+      },
+    );
+    return response.data;
+  } catch {
+    return null;
+  }
+};
+
+export const saveQuestion = async (
+  userId: string,
+  questionId: number,
+  questionOptionId: number,
+  percentageGiven: number,
+): Promise<IAnswerResponse | null> => {
+  try {
+    const response = await axios.post(
+      `${API_HOST_URL}/api/answer/question`,
+      {
+        userId,
+        answer: {
+          questionId,
+          questionOptionId,
+          percentageGiven,
+          percentageGivenForAnswerId: questionId,
+          timeToAnswerInMiliseconds: null,
+        },
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': BOT_API_KEY,
+        },
+      },
+    );
     return response.data;
   } catch {
     return null;

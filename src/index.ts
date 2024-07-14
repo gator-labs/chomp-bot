@@ -3,7 +3,7 @@ import { Telegraf, Markup, Context } from 'telegraf';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { development, production } from './core';
 import { kv } from '@vercel/kv';
-import { IBotUser } from './interfaces/bot-users';
+import { IBotUser } from './interfaces/botUser';
 import {
   adaptCtx2User,
   createUserByTelegram,
@@ -13,7 +13,11 @@ import {
   initEmailAuthentication,
   verifyEmail,
   getQuestion,
+  saveDeck,
+  saveQuestion,
 } from './lib/utils';
+import { IChompUser } from './interfaces/chompUser';
+import { IQuestion } from './interfaces/question';
 
 /*
   SETUP
@@ -89,232 +93,115 @@ bot.start(async (ctx) => {
     const response = await createUserByTelegram(tgId);
     if (response) {
       await kv.set(`user:${tgId}`, response);
+      replyWithPrimaryOptions(ctx);
+    } else {
+      ctx.reply('Failed to create user, please try again!');
     }
   } else {
     await kv.set(`user:${tgId}`, userExists.profile);
+    replyWithPrimaryOptions(ctx);
   }
-
-  replyWithPrimaryOptions(ctx);
 });
 
 /*
   NEW -> ANSWERING FIRST ORDER
 */
 bot.action('new.quickstart', async (ctx) => {
-  try {
-    const user = (await kv.get(`user:${ctx.from.id}`)) as any;
-    const deck = await getQuestion(user.id);
+  const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
+  const questionDeck = await getQuestion(user.id);
+  await kv.set(`question:${ctx.from.id}`, questionDeck);
 
-    const { question, questionOptions } = deck;
+  if (questionDeck) {
+    const { question, questionOptions } = questionDeck;
     const prompt = question;
 
     const buttons = questionOptions.map(
-      (option: { id: number; option: any; isLeft: boolean }, index: number) =>
-        Markup.button.callback(`${option.option}`, option.option),
+      (option: { id: number; option: string; isLeft: boolean }) =>
+        Markup.button.callback(
+          `${option.option}`,
+          `answering-first-order.${option.id}`,
+        ),
     );
     ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-  } catch (error) {
-    console.error('Error making API call:', error);
-    ctx.reply('Failed to fetch data from API.');
+  } else {
+    ctx.reply(
+      'You have already chomp all questions. Please visit later to chomp it.',
+    );
   }
 });
+
 /*
-  ANSWERING FIRST ORDER -> ANSWERING SECOND ORDER
+  ANSWERING SECOND ORDER
 */
-const secondPrompt = 'What percentage of people do you think answered Raydium?';
-const secondButtonOptions: { [k: string]: string } = {
-  'answering-second-order.0': '0%',
-  'answering-second-order.10': '10%',
-  'answering-second-order.20': '20%',
-  'answering-second-order.30': '30%',
-  'answering-second-order.40': '40%',
-  'answering-second-order.50': '50%',
-  'answering-second-order.60': '60%',
-  'answering-second-order.70': '70%',
-  'answering-second-order.80': '80%',
-  'answering-second-order.90': '90%',
-  'answering-second-order.100': '100%',
-};
-const secondButtons = Object.keys(secondButtonOptions).map((key) =>
-  Markup.button.callback(secondButtonOptions[key], key),
-);
-const formattedSecondButtons = [
-  secondButtons.slice(0, 5), // Elements 0-4
-  secondButtons.slice(5, 6), // Element 5
-  secondButtons.slice(6), // Elements 6 and beyond
-];
+bot.action(/^answering-first-order\.(.+)$/, async (ctx) => {
+  const questionDeck = (await kv.get(`question:${ctx.from.id}`)) as IQuestion;
+  const userAnswerId = parseInt(ctx.match[1], 10);
+  const userAnswer = questionDeck?.questionOptions.find(
+    (option) => option.id === userAnswerId,
+  )?.option;
+  const secondPrompt = `What percentage of people do you think answered ${userAnswer}?`;
 
-bot.action('answering-first-order.1', async (ctx) => {
-  ctx.reply(secondPrompt, Markup.inlineKeyboard(formattedSecondButtons));
-});
+  const secondButtonOptions: { [k: string]: string } = {
+    'answering-second-order.0': '0%',
+    'answering-second-order.10': '10%',
+    'answering-second-order.20': '20%',
+    'answering-second-order.30': '30%',
+    'answering-second-order.40': '40%',
+    'answering-second-order.50': '50%',
+    'answering-second-order.60': '60%',
+    'answering-second-order.70': '70%',
+    'answering-second-order.80': '80%',
+    'answering-second-order.90': '90%',
+    'answering-second-order.100': '100%',
+  };
 
-bot.action('answering-first-order.2', async (ctx) => {
-  ctx.reply(secondPrompt, Markup.inlineKeyboard(formattedSecondButtons));
-});
+  const secondButtons = Object.keys(secondButtonOptions).map((key) =>
+    Markup.button.callback(secondButtonOptions[key], `${key}.${userAnswerId}`),
+  );
 
-bot.action('answering-first-order.3', async (ctx) => {
-  ctx.reply(secondPrompt, Markup.inlineKeyboard(formattedSecondButtons));
-});
+  const formattedSecondButtons = [
+    secondButtons.slice(0, 5),
+    secondButtons.slice(5, 6),
+    secondButtons.slice(6),
+  ];
 
-bot.action('answering-first-order.4', async (ctx) => {
   ctx.reply(secondPrompt, Markup.inlineKeyboard(formattedSecondButtons));
 });
 
 /*
-  COMPLETED ANSWERING
+  SAVING ANSWER
 */
 
-bot.action('answering-second-order.0', async (ctx) => {
+bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
+  const questionDeck = (await kv.get(`question:${ctx.from.id}`)) as IQuestion;
+  const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
+  const percentageGiven = Number(ctx.match[1]);
+  const questionOptionId = parseInt(ctx.match[2], 10);
+
+  if (questionDeck) {
+    const { id: questionId, deckId } = questionDeck;
+    const { id: userId } = user;
+
+    if (deckId) {
+      await saveDeck(
+        deckId,
+        userId,
+        questionId,
+        questionOptionId,
+        percentageGiven,
+      );
+    } else {
+      await saveQuestion(userId, questionId, questionOptionId, percentageGiven);
+    }
+  }
+
   const prompt =
     'Well done! You just chomped a question.\n\nWhat do you want to do next?';
   const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
+    'new.quickstart': 'Answer more 🎲',
     'completed-answering.home': 'Go home 🏡',
   };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
 
-bot.action('answering-second-order.10', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.20', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.30', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.40', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.50', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.60', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.70', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.80', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.90', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('answering-second-order.100', async (ctx) => {
-  const prompt =
-    'Well done! You just chomped a question.\n\nWhat do you want to do next?';
-  const buttonOptions: { [k: string]: string } = {
-    'completed-answering.more': 'Answer more 🎲',
-    'completed-answering.home': 'Go home 🏡',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('completed-answering.more', async (ctx) => {
-  const prompt = 'Which of the following is NOT a DEX?';
-  const buttonOptions: { [k: string]: string } = {
-    'answering-first-order.1': 'Jupiter',
-    'answering-first-order.2': 'Raydium',
-    'answering-first-order.3': 'Orca',
-    'answering-first-order.4': 'Phoenix',
-  };
   const buttons = Object.keys(buttonOptions).map((key) =>
     Markup.button.callback(buttonOptions[key], key),
   );
@@ -322,15 +209,7 @@ bot.action('completed-answering.more', async (ctx) => {
 });
 
 bot.action('completed-answering.home', async (ctx) => {
-  const prompt = 'What do you want to do today?';
-  const buttonOptions: { [k: string]: string } = {
-    'new.quickstart': 'Answer questions 🎲',
-    'new.reveal': 'Reveal & claim 💵',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+  replyWithPrimaryOptions(ctx);
 });
 
 /*
@@ -390,7 +269,7 @@ bot.hears(otpRegex, async (ctx) => {
     );
     if (response) {
       await kv.set(`isVerify:${tgId}`, false);
-      const user = (await kv.get(`user:${tgId}`)) as any;
+      const user = (await kv.get(`user:${tgId}`)) as IChompUser;
       const dynamicUser = await handleCreateUser(
         user.id,
         response.user.id,
@@ -399,7 +278,10 @@ bot.hears(otpRegex, async (ctx) => {
         response.user.email,
         ctx,
       );
-      replyWithReveal(ctx);
+      ctx.reply(
+        'Follow the link to burn BONK and reveal!',
+        Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
+      );
     }
   }
 });
@@ -408,37 +290,23 @@ bot.hears(otpRegex, async (ctx) => {
   NEW -> SELECTED REVEAL
 */
 bot.action('new.reveal', async (ctx) => {
-  const user = (await kv.get(`user:${ctx.from.id}`)) as any;
-  if (user?.wallets) {
-    replyWithReveal(ctx);
-  } else {
-    replyWithEmailCollection(ctx);
-  }
+  replyWithReveal(ctx);
 });
 
 bot.action('selected-reveal.no', async (ctx) => {
-  const prompt = 'What do you want to do today?';
-  const buttonOptions: { [k: string]: string } = {
-    'new.quickstart': 'Start answering 🎲',
-    'new.reveal': 'Reveal Answers 💵',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-});
-
-bot.action('revealed.0', async (ctx) => {
-  ctx.reply('Congratulations you just claimed 37,292 BONK!');
-
   replyWithPrimaryOptions(ctx);
 });
 
 bot.action('selected-reveal.yes', async (ctx) => {
-  ctx.reply(
-    'Follow the link to burn BONK and reveal!',
-    Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
-  );
+  const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
+  if (user.wallets.length !== 0) {
+    ctx.reply(
+      'Follow the link to burn BONK and reveal!',
+      Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
+    );
+  } else {
+    replyWithEmailCollection(ctx);
+  }
 });
 
 bot.on('message', async (ctx) => {
