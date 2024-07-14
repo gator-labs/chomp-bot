@@ -225,6 +225,7 @@ export const saveDeck = async (
   questionId: number,
   questionOptionId: number,
   percentageGiven: number,
+  elapsedTime: number
 ): Promise<IAnswerResponse | null> => {
   try {
     const response = await axios.post(
@@ -238,7 +239,7 @@ export const saveDeck = async (
             questionOptionId,
             percentageGiven,
             percentageGivenForAnswerId: questionId,
-            timeToAnswerInMiliseconds: null,
+            timeToAnswerInMiliseconds: elapsedTime,
           },
         ],
       },
@@ -260,6 +261,7 @@ export const saveQuestion = async (
   questionId: number,
   questionOptionId: number,
   percentageGiven: number,
+  elapsedTime: number
 ): Promise<IAnswerResponse | null> => {
   try {
     const response = await axios.post(
@@ -271,7 +273,7 @@ export const saveQuestion = async (
           questionOptionId,
           percentageGiven,
           percentageGivenForAnswerId: questionId,
-          timeToAnswerInMiliseconds: null,
+          timeToAnswerInMiliseconds: elapsedTime,
         },
       },
       {

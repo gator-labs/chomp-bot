@@ -1,5 +1,4 @@
 import { Telegraf, Markup, Context } from 'telegraf';
-
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { development, production } from './core';
 import { kv } from '@vercel/kv';
@@ -27,6 +26,21 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 
 const bot = new Telegraf(BOT_TOKEN);
+
+const userTimers: {
+  [userId: number]: {
+    timer: NodeJS.Timeout | null;
+    startTime: number;
+    remainingTime: number;
+  };
+} = {};
+
+// Function to format milliseconds into minutes and seconds
+function formatTime(ms: number) {
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds > 1 ? 's' : ''}`;
+}
 
 //prod mode (Vercel)
 export const startVercel = async (req: VercelRequest, res: VercelResponse) => {
@@ -109,12 +123,24 @@ bot.start(async (ctx) => {
 bot.action('new.quickstart', async (ctx) => {
   const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
   const questionDeck = await getQuestion(user.id);
-  await kv.set(`question:${ctx.from.id}`, questionDeck);
 
   if (questionDeck) {
-    const { question, questionOptions } = questionDeck;
+    await kv.set(`question:${ctx.from.id}`, questionDeck);
+    const { question, questionOptions, durationMiliseconds } = questionDeck;
     const prompt = question;
 
+    // Clear any existing timer for the user
+    if (userTimers[ctx.from.id]) {
+      clearInterval(userTimers[ctx.from.id]!.timer!);
+      userTimers[ctx.from.id] = { timer: null, startTime: 0, remainingTime: 0 };
+    }
+
+    // Start the timer
+    let remainingTime = durationMiliseconds;
+    const startTime = Date.now();
+    const timerMessageId = await ctx.reply(
+      `Time remaining ⏳: ${formatTime(remainingTime)}`,
+    );
     const buttons = questionOptions.map(
       (option: { id: number; option: string; isLeft: boolean }) =>
         Markup.button.callback(
@@ -122,7 +148,45 @@ bot.action('new.quickstart', async (ctx) => {
           `answering-first-order.${option.id}`,
         ),
     );
-    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+    const questionMessage = await ctx.reply(
+      prompt,
+      Markup.inlineKeyboard(buttons),
+    );
+
+    userTimers[ctx.from.id] = {
+      timer: setInterval(async () => {
+        remainingTime -= 1000;
+        if (remainingTime > 0) {
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            timerMessageId.message_id,
+            undefined,
+            `Time remaining ⏳: ${formatTime(remainingTime)}`,
+          );
+        } else {
+          clearInterval(userTimers[ctx.from.id]!.timer!);
+          userTimers[ctx.from.id] = {
+            timer: null,
+            startTime: 0,
+            remainingTime: 0,
+          };
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            timerMessageId.message_id,
+            undefined,
+            `⌛️ Time's up!`,
+          );
+          await ctx.telegram.deleteMessage(
+            ctx.chat?.id!,
+            questionMessage.message_id,
+          );
+          replyWithPrimaryOptions(ctx);
+          return;
+        }
+      }, 1000),
+      startTime: startTime,
+      remainingTime: durationMiliseconds,
+    };
   } else {
     ctx.reply(
       'You have already chomp all questions. Please visit later to chomp it.',
@@ -139,6 +203,19 @@ bot.action(/^answering-first-order\.(.+)$/, async (ctx) => {
   const userAnswer = questionDeck?.questionOptions.find(
     (option) => option.id === userAnswerId,
   )?.option;
+
+  // Stop the timer and calculate elapsed time
+  const timerData = userTimers[ctx.from.id];
+  if (timerData && timerData.timer) {
+    clearInterval(timerData.timer);
+    timerData.remainingTime -= Date.now() - timerData.startTime;
+    userTimers[ctx.from.id] = {
+      timer: null,
+      startTime: 0,
+      remainingTime: timerData.remainingTime,
+    };
+  }
+
   const secondPrompt = `What percentage of people do you think answered ${userAnswer}?`;
 
   const secondButtonOptions: { [k: string]: string } = {
@@ -178,6 +255,18 @@ bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
   const percentageGiven = Number(ctx.match[1]);
   const questionOptionId = parseInt(ctx.match[2], 10);
 
+  // Calculate elapsed time
+  const timerData = userTimers[ctx.from.id];
+  const elapsedTime = timerData
+    ? questionDeck.durationMiliseconds - timerData.remainingTime
+    : 0;
+
+  // Clear the timer for the user
+  if (timerData && timerData.timer) {
+    clearInterval(timerData.timer);
+    userTimers[ctx.from.id] = { timer: null, startTime: 0, remainingTime: 0 };
+  }
+
   if (questionDeck) {
     const { id: questionId, deckId } = questionDeck;
     const { id: userId } = user;
@@ -189,9 +278,16 @@ bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
         questionId,
         questionOptionId,
         percentageGiven,
+        elapsedTime,
       );
     } else {
-      await saveQuestion(userId, questionId, questionOptionId, percentageGiven);
+      await saveQuestion(
+        userId,
+        questionId,
+        questionOptionId,
+        percentageGiven,
+        elapsedTime,
+      );
     }
   }
 
