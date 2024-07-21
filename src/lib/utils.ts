@@ -7,7 +7,7 @@ import { IQuestion } from '../interfaces/question';
 import { IAnswerResponse } from '../interfaces/answer';
 
 const BOT_API_KEY = process.env.BOT_API_KEY;
-const API_HOST_URL = process.env.API_HOST_URL;
+const WEB_APP_URL = process.env.WEB_APP_URL;
 const DYNAMIC_TOKEN = process.env.DYNAMIC_TOKEN;
 const DYNAMIC_ENVIRONMENT_ID = process.env.DYNAMIC_ENVIRONMENT_ID;
 
@@ -38,7 +38,7 @@ export const createUserByTelegram = async (
   const randomUUID = uuidv4();
   try {
     const response = await axios.post(
-      `${API_HOST_URL}/api/user/telegram`,
+      `${WEB_APP_URL}/api/user/telegram`,
       {
         id: randomUUID,
         telegramId: tgId.toString(),
@@ -63,7 +63,7 @@ export const getUserByTelegram = async (
 ): Promise<IChompUserResponse | null> => {
   try {
     const response = await axios.get(
-      `${API_HOST_URL}/api/user/telegram?telegramId=${tgId.toString()}`,
+      `${WEB_APP_URL}/api/user/telegram?telegramId=${tgId.toString()}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ export const getUserByEmail = async (
 ): Promise<IChompUser | null> => {
   try {
     const response = await axios.get(
-      `${API_HOST_URL}/api/user?email=${email}`,
+      `${WEB_APP_URL}/api/user?email=${email}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ export const getUserByEmail = async (
 export const getQuestion = async (id: string): Promise<IQuestion | null> => {
   try {
     const response = await axios.get(
-      `${API_HOST_URL}/api/question/get?userId=${id}`,
+      `${WEB_APP_URL}/api/question/get?userId=${id}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +197,7 @@ export const handleCreateUser = async (
 ): Promise<IChompUser | null> => {
   try {
     const response = await axios.post(
-      `${API_HOST_URL}/api/user`,
+      `${WEB_APP_URL}/api/user`,
       {
         existingId: id,
         newId,
@@ -229,7 +229,7 @@ export const saveDeck = async (
 ): Promise<IAnswerResponse | null> => {
   try {
     const response = await axios.post(
-      `${API_HOST_URL}/api/answer/deck`,
+      `${WEB_APP_URL}/api/answer/deck`,
       {
         deckId,
         userId,
@@ -265,7 +265,7 @@ export const saveQuestion = async (
 ): Promise<IAnswerResponse | null> => {
   try {
     const response = await axios.post(
-      `${API_HOST_URL}/api/answer/question`,
+      `${WEB_APP_URL}/api/answer/question`,
       {
         userId,
         answer: {
