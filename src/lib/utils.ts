@@ -114,6 +114,25 @@ export const getQuestion = async (id: string): Promise<IQuestion | null> => {
     return null;
   }
 };
+export const getRevealQuestion = async (id: string): Promise<IQuestion | null> => {
+  try {
+    const response = await axios.get(
+      `${WEB_APP_URL}/api/question/reveal?userId=${id}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': BOT_API_KEY,
+        },
+      },
+    );
+    if (response.data.length === 0){
+      return null
+    }
+    return response.data.length
+  } catch {
+    return null;
+  }
+};
 
 // Initialize email verification process
 export const initEmailAuthentication = async (email: string, ctx: Context) => {

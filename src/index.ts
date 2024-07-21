@@ -8,6 +8,7 @@ import {
   createUserByTelegram,
   getUserByEmail,
   getUserByTelegram,
+  getRevealQuestion,
   handleCreateUser,
   initEmailAuthentication,
   verifyEmail,
@@ -52,6 +53,16 @@ ENVIRONMENT !== 'production' && development(bot);
 
 const WEB_APP_URL = process.env.WEB_APP_URL || '';
 
+// Command to show the input box with a button
+bot.command('webapp', (ctx) => {
+  ctx.reply(
+    'Click the button below to open the web app:',
+    Markup.inlineKeyboard([
+      Markup.button.webApp('Open Web App', `${WEB_APP_URL}/bot`),
+    ]),
+  );
+});
+
 bot.on('inline_query', (ctx) => {
   ctx.answerInlineQuery([], {
     button: { text: 'Launch', web_app: { url: WEB_APP_URL } },
@@ -80,8 +91,22 @@ const replyWithEmailCollection = async (ctx: Context) => {
   );
 };
 
+/*
+  GET QUESTION TO REVEALED
+*/
+
 const replyWithReveal = async (ctx: Context) => {
-  const prompt = 'You have 8 questions available to reveal. Reveal all?';
+  const user = (await kv.get(`user:${ctx?.from?.id}`)) as IChompUser;
+  const questionReveal = await getRevealQuestion(user?.id);
+
+  if (!questionReveal) {
+    ctx.reply(
+      'You have no questions available to reveal',
+    );
+  }
+
+  const prompt = `You have ${questionReveal} questions available to reveal. Launch to Reveal?`;
+
   const buttonOptions: { [k: string]: string } = {
     'selected-reveal.no': 'Maybe Later',
     'selected-reveal.yes': 'Yes',
