@@ -82,15 +82,12 @@ export const getUserByEmail = async (
   email: string,
 ): Promise<IChompUser | null> => {
   try {
-    const response = await axios.get(
-      `${WEB_APP_URL}/api/user?email=${email}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': BOT_API_KEY,
-        },
+    const response = await axios.get(`${WEB_APP_URL}/api/user?email=${email}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': BOT_API_KEY,
       },
-    );
+    });
     return response.data;
   } catch {
     return null;
@@ -114,7 +111,7 @@ export const getQuestion = async (id: string): Promise<IQuestion | null> => {
     return null;
   }
 };
-export const getRevealQuestion = async (id: string): Promise<IQuestion | null> => {
+export const getRevealQuestion = async (id: string): Promise<number | null> => {
   try {
     const response = await axios.get(
       `${WEB_APP_URL}/api/question/reveal?userId=${id}`,
@@ -125,10 +122,10 @@ export const getRevealQuestion = async (id: string): Promise<IQuestion | null> =
         },
       },
     );
-    if (response.data.length === 0){
-      return null
+    if (response.data.length <= 0) {
+      return null;
     }
-    return response.data.length
+    return response.data.length;
   } catch {
     return null;
   }

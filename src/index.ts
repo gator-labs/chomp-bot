@@ -82,12 +82,11 @@ const replyWithEmailCollection = async (ctx: Context) => {
 
 const replyWithReveal = async (ctx: Context) => {
   const user = (await kv.get(`user:${ctx?.from?.id}`)) as IChompUser;
-  const questionReveal = await getRevealQuestion(user?.id);
+  const questionRevealCount = await getRevealQuestion(user?.id);
 
-  if (!questionReveal) {
-    const prompt = 
-      `You don't have any questions to reveal. Answer more questions in order to reveal"`
-    
+  if (!questionRevealCount) {
+    const prompt = `You don't have any questions to reveal. Answer more questions in order to reveal"`;
+
     const buttonOptions: { [k: string]: string } = {
       'new.quickstart': 'Keep Chompin',
     };
@@ -95,19 +94,18 @@ const replyWithReveal = async (ctx: Context) => {
       Markup.button.callback(buttonOptions[key], key),
     );
     ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-    return;
+  } else {
+    const prompt = `You have ${questionRevealCount} questions available to reveal. Launch to Reveal?`;
+
+    const buttonOptions: { [k: string]: string } = {
+      'selected-reveal.no': 'Maybe Later',
+      'selected-reveal.yes': 'Yes',
+    };
+    const buttons = Object.keys(buttonOptions).map((key) =>
+      Markup.button.callback(buttonOptions[key], key),
+    );
+    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
   }
-
-  const prompt = `You have ${questionReveal} questions available to reveal. Launch to Reveal?`;
-
-  const buttonOptions: { [k: string]: string } = {
-    'selected-reveal.no': 'Maybe Later',
-    'selected-reveal.yes': 'Yes',
-  };
-  const buttons = Object.keys(buttonOptions).map((key) =>
-    Markup.button.callback(buttonOptions[key], key),
-  );
-  ctx.reply(prompt, Markup.inlineKeyboard(buttons));
 };
 
 /*
@@ -224,12 +222,7 @@ bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
         percentageGiven,
       );
     } else {
-      await saveQuestion(
-        userId,
-        questionId,
-        questionOptionId,
-        percentageGiven,
-      );
+      await saveQuestion(userId, questionId, questionOptionId, percentageGiven);
     }
   }
 
@@ -336,10 +329,10 @@ bot.action('selected-reveal.no', async (ctx) => {
 });
 
 bot.action('selected-reveal.yes', async (ctx) => {
-    ctx.reply(
-      'Follow the link to burn BONK and reveal!',
-      Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
-    );
+  ctx.reply(
+    'Follow the link to burn BONK and reveal!',
+    Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
+  );
 });
 
 bot.on('message', async (ctx) => {
