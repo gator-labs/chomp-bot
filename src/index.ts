@@ -85,9 +85,17 @@ const replyWithReveal = async (ctx: Context) => {
   const questionReveal = await getRevealQuestion(user?.id);
 
   if (!questionReveal) {
-    ctx.reply(
-      'You have no questions available to reveal',
+    const prompt = 
+      `You don't have any questions to reveal. Answer more questions in order to reveal"`
+    
+    const buttonOptions: { [k: string]: string } = {
+      'new.quickstart': 'Keep Chompin',
+    };
+    const buttons = Object.keys(buttonOptions).map((key) =>
+      Markup.button.callback(buttonOptions[key], key),
     );
+    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+    return;
   }
 
   const prompt = `You have ${questionReveal} questions available to reveal. Launch to Reveal?`;
@@ -328,15 +336,10 @@ bot.action('selected-reveal.no', async (ctx) => {
 });
 
 bot.action('selected-reveal.yes', async (ctx) => {
-  const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
-  if (user.wallets.length !== 0) {
     ctx.reply(
       'Follow the link to burn BONK and reveal!',
       Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
     );
-  } else {
-    replyWithEmailCollection(ctx);
-  }
 });
 
 bot.on('message', async (ctx) => {
