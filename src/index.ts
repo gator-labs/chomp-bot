@@ -35,7 +35,7 @@ ENVIRONMENT !== 'production' && development(bot);
 
 bot.on('inline_query', (ctx) => {
   ctx.answerInlineQuery([], {
-    button: { text: 'Launch', web_app: { url: WEB_APP_URL } },
+    button: { text: 'Launch', web_app: { url: WEB_APP_URL + '/bot' } },
   });
 });
 
@@ -231,7 +231,9 @@ bot.action('selected-reveal.no', async (ctx) => {
 bot.action('selected-reveal.yes', async (ctx) => {
   ctx.reply(
     'Follow the link to burn BONK and reveal!',
-    Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
+    Markup.inlineKeyboard([
+      Markup.button.webApp('Launch', WEB_APP_URL + '/bot'),
+    ]),
   );
 });
 
