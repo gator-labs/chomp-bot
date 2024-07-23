@@ -25,7 +25,6 @@ export const adaptCtx2User = (ctx: Context) => {
     tg_is_bot: ctx.from?.is_bot!,
     tg_language_code: ctx.from?.language_code!,
     state: EBotUserState.NEW,
-    original_email_address: 'overwrite',
   };
 
   return newUser;
@@ -77,23 +76,6 @@ export const getUserByTelegram = async (
   }
 };
 
-// Fetch user by Email
-export const getUserByEmail = async (
-  email: string,
-): Promise<IChompUser | null> => {
-  try {
-    const response = await axios.get(`${WEB_APP_URL}/api/user?email=${email}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': BOT_API_KEY,
-      },
-    });
-    return response.data;
-  } catch {
-    return null;
-  }
-};
-
 // Get questions from daily deck and unanswered questions
 export const getQuestion = async (id: string): Promise<IQuestion | null> => {
   try {
@@ -111,6 +93,7 @@ export const getQuestion = async (id: string): Promise<IQuestion | null> => {
     return null;
   }
 };
+
 export const getRevealQuestion = async (id: string): Promise<number | null> => {
   try {
     const response = await axios.get(
@@ -126,110 +109,6 @@ export const getRevealQuestion = async (id: string): Promise<number | null> => {
       return null;
     }
     return response.data.length;
-  } catch {
-    return null;
-  }
-};
-
-// Initialize email verification process
-export const initEmailAuthentication = async (email: string, ctx: Context) => {
-  const emailData = {
-    email,
-  };
-
-  const emailVerifyOptions = {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(emailData),
-  };
-
-  const initEmailVerifyUrl = `${baseUrl}/sdk/${DYNAMIC_ENVIRONMENT_ID}/emailVerifications/create`;
-  const { verificationUUID } = await fetch(
-    initEmailVerifyUrl,
-    emailVerifyOptions,
-  )
-    .then((response) => response.json())
-    .catch((err) => console.error(err));
-
-  ctx.reply(
-    'Awesome. We just sent you an email. Please respond with the code from the email.',
-  );
-  return verificationUUID;
-};
-
-// Verify OTP and create embedded wallet based on email as identifier
-export const verifyEmail = async (
-  email: string,
-  verificationUUID: string,
-  verificationToken: string,
-  ctx: Context,
-) => {
-  const emailVerifyData = {
-    verificationUUID,
-    verificationToken,
-  };
-
-  const verifyEmailUrl = `${baseUrl}/sdk/${DYNAMIC_ENVIRONMENT_ID}/emailVerifications/signin`;
-
-  try {
-    const response = await axios.post(verifyEmailUrl, emailVerifyData, {
-      headers,
-    });
-
-    ctx.reply('Email verified successfully!');
-
-    const newUserData = {
-      chain: 'SOL',
-      type: 'email',
-      identifier: email,
-    };
-
-    const newUserOptions = {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(newUserData),
-    };
-
-    const newUserUrl = `${baseUrl}/environments/${process.env.DYNAMIC_ENVIRONMENT_ID}/embeddedWallets`;
-    const dynamicUser = await fetch(newUserUrl, newUserOptions)
-      .then((response) => response.json())
-      .catch((err) => console.error(err));
-
-    return dynamicUser;
-  } catch {
-    ctx.reply('Email verification failed, please provide correct OTP.');
-    return null;
-  }
-};
-
-// Replace temporary user with dynamic user including email and wallet in the database
-export const handleCreateUser = async (
-  id: string,
-  newId: string,
-  tgId: number,
-  address: string,
-  email: string,
-  ctx: Context,
-): Promise<IChompUser | null> => {
-  try {
-    const response = await axios.post(
-      `${WEB_APP_URL}/api/user`,
-      {
-        existingId: id,
-        newId,
-        telegramId: tgId.toString(),
-        email,
-        address,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': BOT_API_KEY,
-        },
-      },
-    );
-    ctx.reply('Wallet created successfully!');
-    return response.data;
   } catch {
     return null;
   }

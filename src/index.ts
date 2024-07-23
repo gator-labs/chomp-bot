@@ -6,12 +6,8 @@ import { IBotUser } from './interfaces/botUser';
 import {
   adaptCtx2User,
   createUserByTelegram,
-  getUserByEmail,
   getUserByTelegram,
   getRevealQuestion,
-  handleCreateUser,
-  initEmailAuthentication,
-  verifyEmail,
   getQuestion,
   saveDeck,
   saveQuestion,
@@ -25,6 +21,7 @@ import { IQuestion } from './interfaces/question';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
+const WEB_APP_URL = process.env.WEB_APP_URL || '';
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -35,18 +32,6 @@ export const startVercel = async (req: VercelRequest, res: VercelResponse) => {
 
 //dev mode
 ENVIRONMENT !== 'production' && development(bot);
-
-const WEB_APP_URL = process.env.WEB_APP_URL || '';
-
-// Command to show the input box with a button
-bot.command('webapp', (ctx) => {
-  ctx.reply(
-    'Click the button below to open the web app:',
-    Markup.inlineKeyboard([
-      Markup.button.webApp('Open Web App', `${WEB_APP_URL}/bot`),
-    ]),
-  );
-});
 
 bot.on('inline_query', (ctx) => {
   ctx.answerInlineQuery([], {
@@ -64,16 +49,6 @@ const replyWithPrimaryOptions = async (ctx: Context) => {
     Markup.button.callback(buttonOptions[key], key),
   );
   ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-};
-
-const replyWithEmailCollection = async (ctx: Context) => {
-  const moreInfoKeyboard = Markup.inlineKeyboard([
-    Markup.button.callback('Why do you need my email?', 'new.email-info'),
-  ]);
-  ctx.reply(
-    'Welcome to Chomp! 🦷\n\nPlease provide your email address so Chomp Bot can generate a Solana wallet for you.',
-    moreInfoKeyboard,
-  );
 };
 
 /*
@@ -202,7 +177,6 @@ bot.action(/^answering-first-order\.(.+)$/, async (ctx) => {
 /*
   SAVING ANSWER
 */
-
 bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
   const questionDeck = (await kv.get(`question:${ctx.from.id}`)) as IQuestion;
   const user = (await kv.get(`user:${ctx.from.id}`)) as IChompUser;
@@ -241,80 +215,6 @@ bot.action(/^answering-second-order\.(.+)\.(.+)$/, async (ctx) => {
 
 bot.action('completed-answering.home', async (ctx) => {
   replyWithPrimaryOptions(ctx);
-});
-
-/*
-  NEW -> ENTERING_EMAIL
-*/
-
-bot.action('new.email-info', async (ctx) => {
-  const prompt = `Chomp Bot uses your email to create a new Solana wallet for you to play\\. Your email address will be the owner and sole custodian of the wallet\\. [Learn more](https://gator\\.fyi)\\.
-*Please respond with your email address to continue\\.*`;
-  ctx.replyWithMarkdownV2(prompt);
-});
-
-/*
-  Email Message received
-*/
-// https://stackoverflow.com/questions/201323/how-can-i-validate-an-email-address-using-a-regular-expression
-const emailRegex =
-  /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/;
-
-bot.hears(emailRegex, async (ctx) => {
-  const { match: emailAddresses } = ctx;
-  const emailAddress = emailAddresses[0];
-  await kv.set(`email:${ctx.from.id}`, emailAddress);
-
-  // check if user exists
-  const userExists = await getUserByEmail(emailAddress);
-
-  if (userExists) {
-    replyWithReveal(ctx);
-  } else {
-    const verificationUUID = await initEmailAuthentication(emailAddress, ctx);
-    await kv.set(`verification:${ctx.from.id}`, verificationUUID);
-    await kv.set(`isVerify:${ctx.from.id}`, true);
-  }
-});
-
-/*
-  Email Verification
-*/
-const otpRegex = /(?:\d{6})/;
-bot.hears(otpRegex, async (ctx) => {
-  const tgId = ctx.from.id;
-  const isVerify = (await kv.get(`isVerify:${tgId}`)) as boolean;
-  if (!isVerify) {
-    ctx.reply('Please type /start to continue.');
-    return;
-  } else {
-    const { match: otps } = ctx;
-    const otp = otps[0];
-    const emailAddress = (await kv.get(`email:${tgId}`)) as string;
-    const verificationUUID = (await kv.get(`verification:${tgId}`)) as string;
-    const response = await verifyEmail(
-      emailAddress,
-      verificationUUID,
-      otp,
-      ctx,
-    );
-    if (response) {
-      await kv.set(`isVerify:${tgId}`, false);
-      const user = (await kv.get(`user:${tgId}`)) as IChompUser;
-      const dynamicUser = await handleCreateUser(
-        user.id,
-        response.user.id,
-        tgId,
-        response.user.walletPublicKey,
-        response.user.email,
-        ctx,
-      );
-      ctx.reply(
-        'Follow the link to burn BONK and reveal!',
-        Markup.inlineKeyboard([Markup.button.webApp('Launch', WEB_APP_URL)]),
-      );
-    }
-  }
 });
 
 /*
