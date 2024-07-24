@@ -52,38 +52,6 @@ const replyWithPrimaryOptions = async (ctx: Context) => {
 };
 
 /*
-  GET QUESTION TO REVEALED
-*/
-
-const replyWithReveal = async (ctx: Context) => {
-  const user = (await kv.get(`user:${ctx?.from?.id}`)) as IChompUser;
-  const questionRevealCount = await getRevealQuestion(user?.id);
-
-  if (!questionRevealCount) {
-    const prompt = `You don't have any questions to reveal. Answer more questions in order to reveal"`;
-
-    const buttonOptions: { [k: string]: string } = {
-      'new.quickstart': 'Keep Chompin',
-    };
-    const buttons = Object.keys(buttonOptions).map((key) =>
-      Markup.button.callback(buttonOptions[key], key),
-    );
-    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-  } else {
-    const prompt = `You have ${questionRevealCount} questions available to reveal. Launch to Reveal?`;
-
-    const buttonOptions: { [k: string]: string } = {
-      'selected-reveal.no': 'Maybe Later',
-      'selected-reveal.yes': 'Yes',
-    };
-    const buttons = Object.keys(buttonOptions).map((key) =>
-      Markup.button.callback(buttonOptions[key], key),
-    );
-    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
-  }
-};
-
-/*
   ENTRYPOINT - START
 */
 bot.start(async (ctx) => {
@@ -134,6 +102,8 @@ bot.action('new.quickstart', async (ctx) => {
     );
   }
 });
+
+
 
 /*
   ANSWERING SECOND ORDER
@@ -218,12 +188,41 @@ bot.action('completed-answering.home', async (ctx) => {
 });
 
 /*
-  NEW -> SELECTED REVEAL
+  GET QUESTION TO REVEALED
 */
+
 bot.action('new.reveal', async (ctx) => {
-  replyWithReveal(ctx);
+  const user = (await kv.get(`user:${ctx?.from?.id}`)) as IChompUser;
+  const questionRevealCount = await getRevealQuestion(user?.id);
+
+  if (!questionRevealCount) {
+    const prompt = `You don't have any questions to reveal. Answer more questions in order to reveal"`;
+
+    const buttonOptions: { [k: string]: string } = {
+      'new.quickstart': 'Keep Chompin',
+    };
+    const buttons = Object.keys(buttonOptions).map((key) =>
+      Markup.button.callback(buttonOptions[key], key),
+    );
+    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+  } else {
+    const prompt = `You have ${questionRevealCount} questions available to reveal. Launch to Reveal?`;
+
+    const buttonOptions: { [k: string]: string } = {
+      'selected-reveal.no': 'Maybe Later',
+      'selected-reveal.yes': 'Yes',
+    };
+    
+    const buttons = Object.keys(buttonOptions).map((key) =>
+      Markup.button.callback(buttonOptions[key], key),
+    );
+    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+  }
 });
 
+/*
+  NEW -> SELECTED REVEAL
+*/
 bot.action('selected-reveal.no', async (ctx) => {
   replyWithPrimaryOptions(ctx);
 });
