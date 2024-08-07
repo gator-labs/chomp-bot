@@ -85,7 +85,7 @@ bot.action('new.quickstart', async (ctx) => {
 
   if (questionDeck) {
     await kv.set(`question:${ctx.from.id}`, questionDeck);
-    const { question, questionOptions } = questionDeck;
+    const { question, questionOptions, imageUrl } = questionDeck;
     const prompt = question;
 
     const buttons = questionOptions.map(
@@ -95,15 +95,20 @@ bot.action('new.quickstart', async (ctx) => {
           `answering-first-order.${option.id}`,
         ),
     );
-    ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+    if (imageUrl) {
+      ctx.replyWithPhoto(
+        { url: imageUrl },
+        { caption: prompt, ...Markup.inlineKeyboard(buttons) },
+      );
+    } else {
+      ctx.reply(prompt, Markup.inlineKeyboard(buttons));
+    }
   } else {
     ctx.reply(
       'You have already chomp all questions. Please visit later to chomp it.',
     );
   }
 });
-
-
 
 /*
   ANSWERING SECOND ORDER
@@ -212,7 +217,7 @@ bot.action('new.reveal', async (ctx) => {
       'selected-reveal.no': 'Maybe Later',
       'selected-reveal.yes': 'Yes',
     };
-    
+
     const buttons = Object.keys(buttonOptions).map((key) =>
       Markup.button.callback(buttonOptions[key], key),
     );
