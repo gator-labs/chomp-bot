@@ -125,7 +125,6 @@ export const saveDeck = async (
     const response = await axios.post(
       `${WEB_APP_URL}/api/answer/deck`,
       {
-        deckId,
         userId,
         answers: [
           {
@@ -134,6 +133,7 @@ export const saveDeck = async (
             percentageGiven,
             percentageGivenForAnswerId: questionOptionId,
             timeToAnswerInMiliseconds: null,
+            deckId
           },
         ],
       },
