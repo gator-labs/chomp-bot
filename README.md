@@ -1,27 +1,18 @@
 # Chomp Bot
 
-## Development
-
-### Generating DB types
-
-```
-supabase gen types typescript --project-id PROJECT_ID > src/supabase/database.types.ts
-```
-
-# Telegram Bot Vercel Boilerplate
-
-Telegram Bot Vercel Boilerplate based on Node.js and [Telegraf](https://github.com/telegraf/telegraf) framework.
-
-This template inspired by [Telegram Bot Boilerplate](https://github.com/yakovlevyuri/telegram-bot-boilerplate) for easily deploy to [Vercel](https://vercel.com).
-
-[![Live Demo](https://img.shields.io/badge/Medium-12100E?style=for-the-badge&logo=medium&logoColor=white)](https://medium.com/@7rodma/deploy-a-serverless-telegram-chatbot-using-vercel-57665d942a58)
-
 ## Before you start
 
 First rename `.env-sample` file to `.env` and fill in all necessary values.
 
-```
-BOT_TOKEN="<YOUR_BOT_API_TOKEN>"
+```sh
+# ChompTestBot (staging), ChompDevBot (local), and ChompDotGamesBot (prod) in 1Password
+BOT_TOKEN=
+
+# Use ngrok to expose PWA locally
+# ngrok http --domain=stunning-socially-griffon.ngrok-free.app 3000
+# Don't forget to add to Dynamic CORS origins
+# Set webapp URL (BotFather -> /setdomain)
+WEB_APP_URL=
 ```
 
 ## Start your local server
