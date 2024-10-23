@@ -56,6 +56,7 @@ const getMiniAppButton = (ctx: any) => {
 
   const url = `${miniAppUrl}/?telegramAuthToken=${encodedTelegramAuthToken}`;
   console.log('[DEBUG] URL', url);
+
   return Markup.button.webApp(openText, url);
 };
 
@@ -111,7 +112,7 @@ const generateTelegramHash = (data: any) => {
 
   // Generate HMAC-SHA256 hash from the data check string
   return nodeCrypto
-    .createHmac('sha256', TELEGRAM_SECRET)
+    .createHmac('sha256', new Uint8Array(TELEGRAM_SECRET))
     .update(dataCheckArr)
     .digest('hex');
 };
