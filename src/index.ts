@@ -3,6 +3,14 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { development, production } from './core';
 import * as jwt from 'jsonwebtoken';
 import * as nodeCrypto from 'crypto';
+import {
+  createUserByTelegram,
+  getSubscribedUsers,
+  getUserByTelegram,
+  updateUserNotification,
+} from './lib/utils';
+import { kv } from '@vercel/kv';
+import { ISubscribedUser } from './interfaces/subscribedUser';
 
 /*
   SETUP
@@ -14,9 +22,8 @@ const WEB_APP_URL = process.env.WEB_APP_URL || '';
 
 const bot = new Telegraf(BOT_TOKEN);
 
-const miniAppUrl = WEB_APP_URL;
+const miniAppUrl = WEB_APP_URL + '/bot';
 const openText = 'Open the app to start CHOMPing!';
-const openId = 'button.miniapp';
 
 //prod mode (Vercel)
 export const startVercel = async (req: VercelRequest, res: VercelResponse) => {
@@ -64,10 +71,92 @@ const getMiniAppButton = (ctx: any) => {
   ENTRYPOINT - START
 */
 bot.start(async (ctx) => {
+  const telegramId = ctx.from?.id;
+
+  // Handle user sign up and get user ID
+  let userId: string;
+  const user = await getUserByTelegram(telegramId);
+
+  if (!user?.profile) {
+    const newUser = await createUserByTelegram(telegramId);
+    if (!newUser?.profile) {
+      return ctx.reply('Failed to create user.');
+    }
+    userId = newUser.profile.id;
+  } else {
+    userId = user.profile.id;
+  }
+
+  // Set user ID in KV
+  await kv.set(`user-${telegramId}`, userId);
+
+  // Get all subscribed users
+  const subscribedUsers = await getSubscribedUsers();
+  await kv.set('subscribers', subscribedUsers);
+
+  // Auto-subscribe new users
+  if (
+    !subscribedUsers.find((user) => user.telegramId === telegramId) &&
+    userId
+  ) {
+    const updatedSubscribers = await updateUserNotification(
+      telegramId,
+      true,
+      userId,
+    );
+    await kv.set('subscribers', updatedSubscribers);
+  }
+
   ctx.reply(openText, Markup.inlineKeyboard([getMiniAppButton(ctx)]));
 });
 
+// Unsubscribe from notifications
+bot.command('unsubscribe', async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  // Check if the user is already subscribed
+  const subscribedUsers = (await kv.get('subscribers')) as ISubscribedUser[];
+  if (!subscribedUsers.find((user) => user.telegramId === telegramId)) {
+    return ctx.reply('You are not currently subscribed to notifications.');
+  }
+
+  const userId = (await kv.get(`user-${telegramId}`)) as string;
+  // Update the user's subscription status
+  const updatedSubscribers = await updateUserNotification(
+    telegramId,
+    false,
+    userId,
+  );
+  await kv.set('subscribers', updatedSubscribers);
+  ctx.reply('You have unsubscribed from notifications successfully.');
+});
+
+// Resubscribe to notifications
+bot.command('resubscribe', async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  // Check if the user is already subscribed
+  const subscribedUsers = (await kv.get('subscribers')) as ISubscribedUser[];
+  if (subscribedUsers.find((user) => user.telegramId === telegramId)) {
+    return ctx.reply('You have already subscribed to notifications.');
+  }
+
+  // Update the user's subscription status
+  const userId = (await kv.get(`user-${telegramId}`)) as string;
+  const updatedSubscribers = await updateUserNotification(
+    telegramId,
+    true,
+    userId,
+  );
+  await kv.set('subscribers', updatedSubscribers);
+  ctx.reply('You have subscribed to notifications successfully.');
+});
+
+// Default message handler
 bot.on('message', async (ctx) => {
+  if (ctx.text?.startsWith('/')) return;
   console.log('Got a message');
   ctx.reply(openText, Markup.inlineKeyboard([getMiniAppButton(ctx)]));
 });
