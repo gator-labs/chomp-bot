@@ -9,11 +9,7 @@ export interface IChompUser {
   id: string;
   isAdmin: boolean;
   telegramId: number;
-  isSubscriber: boolean;
+  isBotSubscriber: boolean;
   username: string | null;
   wallets: Wallet[];
-}
-
-export interface IChompUserResponse {
-  profile: IChompUser;
 }
