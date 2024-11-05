@@ -1,5 +1,6 @@
 # Chomp Bot
 
+
 ## Before you start
 
 First rename `.env-sample` file to `.env` and fill in all necessary values.
