@@ -16,10 +16,11 @@ import {
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const WEB_APP_URL = process.env.WEB_APP_URL || '';
+const LOGIN_PATH = process.env.LOGIN_PATH || '';
 
 const bot = new Telegraf(BOT_TOKEN);
 
-const miniAppUrl = WEB_APP_URL + '/bot';
+const miniAppUrl = WEB_APP_URL + LOGIN_PATH;
 const openText = 'Open the app to start CHOMPing!';
 
 // Production mode (Vercel)
@@ -33,7 +34,7 @@ ENVIRONMENT !== 'production' && development(bot);
 const getMiniAppButton = (ctx: any) => {
   const { encodedTelegramAuthToken } = encodeTelegramPayload(ctx);
 
-  const url = `${miniAppUrl}/?telegramAuthToken=${encodedTelegramAuthToken}`;
+  const url = `${miniAppUrl}?telegramAuthToken=${encodedTelegramAuthToken}`;
   console.log('[DEBUG] URL', url);
 
   return Markup.button.webApp(openText, url);
@@ -46,7 +47,7 @@ bot.start(async (ctx) => {
   const telegramId = ctx.from?.id;
 
   // Handle user sign up and get user ID
-  let userId: string;
+  let username: string;
   const user = await getUserByTelegram(ctx);
 
   if (!user) {
@@ -54,9 +55,9 @@ bot.start(async (ctx) => {
     if (!newUser) {
       return ctx.reply('Failed to create user.');
     }
-    userId = newUser.id;
+    username = newUser.username || '';
   } else {
-    userId = user.id;
+    username = user.username || '';
   }
 
   // Get all subscribed users
@@ -64,8 +65,8 @@ bot.start(async (ctx) => {
 
   // Auto-subscribe new users
   if (
-    !subscribedUsers.find((user) => user.telegramId === telegramId) &&
-    userId
+    !subscribedUsers.find((user) => user.telegramUsername === username) &&
+    username
   ) {
     await updateUserNotification(ctx, true);
   }

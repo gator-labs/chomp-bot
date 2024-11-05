@@ -57,7 +57,7 @@ async function sendNotification() {
 
     // Get subscribed users from the bot's context
     const response = await axios.get(
-      `${process.env.WEB_APP_URL}/api/notification`,
+      `${process.env.WEB_APP_URL}/api/users/getSubscribedUsers`,
       {
         headers: {
           'Content-Type': 'application/json',

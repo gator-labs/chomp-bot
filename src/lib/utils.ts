@@ -124,7 +124,7 @@ export const getUserByTelegram = async (
   const { encodedTelegramAuthToken } = encodeTelegramPayload(ctx);
   try {
     const response = await axios.get(
-      `${WEB_APP_URL}/api/user/getUserByTelegramId?telegramAuthToken=${encodedTelegramAuthToken}`,
+      `${WEB_APP_URL}/api/user/getUserByTelegram?telegramAuthToken=${encodedTelegramAuthToken}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ export const createUserByTelegram = async (
   const { encodedTelegramAuthToken } = encodeTelegramPayload(ctx);
   try {
     const response = await axios.post(
-      `${WEB_APP_URL}/api/user/createUserByTelegramId`,
+      `${WEB_APP_URL}/api/user/createUserByTelegram`,
       { telegramAuthToken: encodedTelegramAuthToken },
       {
         headers: {
