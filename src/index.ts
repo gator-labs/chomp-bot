@@ -16,11 +16,10 @@ import {
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ENVIRONMENT = process.env.NODE_ENV || '';
 const WEB_APP_URL = process.env.WEB_APP_URL || '';
-const LOGIN_PATH = process.env.LOGIN_PATH || '';
 
 const bot = new Telegraf(BOT_TOKEN);
 
-const miniAppUrl = WEB_APP_URL + LOGIN_PATH;
+const miniAppUrl = WEB_APP_URL + '/login';
 const openText = 'Open the app to start CHOMPing!';
 
 // Production mode (Vercel)
@@ -44,8 +43,6 @@ const getMiniAppButton = (ctx: any) => {
   ENTRYPOINT - START
 */
 bot.start(async (ctx) => {
-  const telegramId = ctx.from?.id;
-
   // Handle user sign up and get user ID
   let username: string;
   const user = await getUserByTelegram(ctx);
@@ -60,17 +57,6 @@ bot.start(async (ctx) => {
     username = user.username || '';
   }
 
-  // Get all subscribed users
-  const subscribedUsers = await getSubscribedUsers();
-
-  // Auto-subscribe new users
-  if (
-    !subscribedUsers.find((user) => user.telegramUsername === username) &&
-    username
-  ) {
-    await updateUserNotification(ctx, true);
-  }
-
   ctx.reply(openText, Markup.inlineKeyboard([getMiniAppButton(ctx)]));
 });
 
@@ -80,7 +66,7 @@ bot.command('unsubscribe', async (ctx) => {
 
   // Check if the user is already subscribed
   const subscribedUsers = await getSubscribedUsers();
-  
+
   if (!subscribedUsers.find((user) => user.telegramId === telegramId)) {
     return ctx.reply('You are not currently subscribed to notifications.');
   }
