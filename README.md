@@ -1,6 +1,5 @@
 # Chomp Bot
 
-
 ## Before you start
 
 First rename `.env-sample` file to `.env` and fill in all necessary values.
@@ -23,14 +22,13 @@ yarn
 yarn dev
 ```
 
-## Production
+## Send notification to subscribers using script
 
-You can fork this template and do the necessary changes you need. Then you when are done with your changes simply goto [vercel git import](https://vercel.com/import/git).
+Add the environment variables properly and make sure to maintain format of the message in shell
 
-Reference to [this update](https://vercel.com/docs/security/deployment-protection#migrating-to-standard-protection), you need turn off `Vercel Authentication`, Settings => Deployment Protection
+```sh
+# Run this command in terminal and enter your message
+yarn tg:notify-all
+```
 
-Feel free to create PR!
-
-## Demo
-
-You can see a working version of the bot at [@Node_api_m_bot](https://t.me/Node_api_m_bot)
+You need to confirm before sending notification.
