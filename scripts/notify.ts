@@ -8,7 +8,9 @@ require('dotenv').config({
 });
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
-const ENVIRONMENT = process.env.NODE_ENV || '';
+const WEB_APP_URL = process.env.WEB_APP_URL || '';
+const ENVIRONMENT =
+  WEB_APP_URL === 'https://app.chomp.games' ? 'PRODUCTION' : 'DEVELOPMENT';
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -26,12 +28,12 @@ const question = (query: string): Promise<string> => {
 async function sendNotification() {
   try {
     // Environment warning
-    if (ENVIRONMENT === 'production') {
+    if (ENVIRONMENT === 'PRODUCTION') {
       console.log(
         '⚠️  WARNING: You are connected to PRODUCTION environment!\n',
       );
     } else {
-      console.log('🔧 Running in development environment\n');
+      console.log('🔧 Running in DEVELOPMENT environment\n');
     }
 
     // Get notification text
@@ -45,7 +47,7 @@ async function sendNotification() {
 
     // Environment confirmation
     console.log(
-      `This message will be sent to all subscribed users in ${ENVIRONMENT.toUpperCase()} environment`,
+      `This message will be sent to all subscribed users in ${ENVIRONMENT} environment`,
     );
 
     const confirm = await question('\nSend notification? (y/n): ');
