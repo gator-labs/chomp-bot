@@ -1,4 +1,4 @@
-import { Telegraf, Markup } from 'telegraf';
+import { Telegraf, Markup, Input } from 'telegraf';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { development, production } from './core';
 import {
@@ -8,6 +8,8 @@ import {
   getUserByTelegram,
   updateUserNotification,
 } from './lib/utils';
+const path = require('path');
+// import welcomeImg from './img/chomp.png'
 
 /*
   SETUP
@@ -20,7 +22,8 @@ const WEB_APP_URL = process.env.WEB_APP_URL || '';
 const bot = new Telegraf(BOT_TOKEN);
 
 const miniAppUrl = WEB_APP_URL + '/login';
-const openText = 'Open the app to start CHOMPing!';
+const openText = 'welcome to CHOMP, the best place for you to play + earn $BONK! the more right you are, the more you earn. 🤑 new decks daily ⏰.';
+const buttonCTA = "Open the app to start CHOMPing!";
 
 // Production mode (Vercel)
 export const startVercel = async (req: VercelRequest, res: VercelResponse) => {
@@ -36,7 +39,7 @@ const getMiniAppButton = (ctx: any) => {
   const url = `${miniAppUrl}?telegramAuthToken=${encodedTelegramAuthToken}`;
   console.log('[DEBUG] URL', url);
 
-  return Markup.button.webApp(openText, url);
+  return Markup.button.webApp(buttonCTA, url);
 };
 
 /*
@@ -95,6 +98,6 @@ bot.command('resubscribe', async (ctx) => {
 // Default message handler
 bot.on('message', async (ctx) => {
   if (ctx.text?.startsWith('/')) return;
-  console.log('Got a message');
-  ctx.reply(openText, Markup.inlineKeyboard([getMiniAppButton(ctx)]));
+  await ctx.replyWithPhoto({ source: path.resolve(__dirname, 'img/welcome.png') });
+  await ctx.reply(openText, Markup.inlineKeyboard([getMiniAppButton(ctx)]));
 });
